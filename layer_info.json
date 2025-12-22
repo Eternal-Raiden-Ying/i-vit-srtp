@@ -1,0 +1,110 @@
+--- Layer 0 ---
+{
+  "Name": "__mye780_0_myl0_0",
+  "LayerType": "shape_call",
+  "Inputs": [],
+  "Outputs": [],
+  "TacticName": "",
+  "StreamId": 0,
+  "Metadata": ""
+}
+--- Layer 1 ---
+{
+  "Name": "__myl_MulMinMaxRounCast_myl0_1",
+  "LayerType": "kgen",
+  "Inputs": [
+  {
+    "Name": "input",
+    "Dimensions": [-1,16],
+    "Format/Datatype": "Float"
+  }],
+  "Outputs": [
+  {
+    "Name": "/qact_fc1/QuantizeLinear_output_0.1_4_myl0",
+    "Dimensions": [-1,16],
+    "Format/Datatype": "Int8"
+  }],
+  "TacticName": "__myl_MulMinMaxRounCast_0x70d167656fad6d662e55dc2930c5d5a5",
+  "StreamId": 0,
+  "Metadata": "[ONNX Layer: /qact_input/QuantizeLinear]"
+}
+--- Layer 2 ---
+{
+  "Name": "/fc1/Gemm_myl0_2",
+  "LayerType": "gemm",
+  "Inputs": [
+  {
+    "Name": "/qact_fc1/QuantizeLinear_output_0.1_4_myl0",
+    "Dimensions": [-1,16],
+    "Format/Datatype": "Int8"
+  }],
+  "Outputs": [
+  {
+    "Name": "__myln_k_arg__bb1_5_myl0",
+    "Dimensions": [-1,64],
+    "Format/Datatype": "Int8"
+  }],
+  "TacticName": "sm80_xmma_gemm_i8i8_i8i32_f32_tn_n_tilesize256x64x64_stage3_warpsize4x1x1_tensor16x8x32",
+  "StreamId": 0,
+  "Metadata": "[ONNX Layer: /fc1/Gemm]\u001f[ONNX Layer: /qact_input/DequantizeLinear]\u001f[ONNX Layer: /fc1/DequantizeLinear]\u001f[ONNX Layer: /qact_fc1/QuantizeLinear]\u001f[ONNX Layer: /fc1/QuantizeLinear]"
+}
+--- Layer 3 ---
+{
+  "Name": "__myl_CastRounMaxrSubDivFlooDivFlooAddSubMaxDivFlooSubMulSubPowMulAddFlooMulFlooMaxMinSumMaxMinEtc_myl0_3",
+  "LayerType": "kgen",
+  "Inputs": [
+  {
+    "Name": "__myln_k_arg__bb1_5_myl0",
+    "Dimensions": [-1,64],
+    "Format/Datatype": "Int8"
+  }],
+  "Outputs": [
+  {
+    "Name": "/fc2/Gemm_output_0.1_6_myl0",
+    "Dimensions": [-1,64],
+    "Format/Datatype": "Float"
+  }],
+  "TacticName": "__myl_CastRounMaxrSubDivFlooDivFlooAddSubMaxDivFlooSubMulSubPowMulAddFlooMulFlooMaxMinSumMaxMinEtc_0x43c716c0abba9c5be5b245e0ed794dd4",
+  "StreamId": 0,
+  "Metadata": "[ONNX Layer: /softmax/Mul_4]\u001f[ONNX Layer: /softmax/Reciprocal_1]\u001f[ONNX Layer: /softmax/Mul_5]\u001f[ONNX Layer: /softmax/Div_5]\u001f[ONNX Layer: /softmax/Floor_7]\u001f[ONNX Layer: /softmax/Floor_6]\u001f[ONNX Layer: /softmax/Floor_5]\u001f[ONNX Layer: /softmax/ReduceSum]\u001f[ONNX Layer: /softmax/Max]\u001f[ONNX Layer: /softmax/Mul_1]\u001f[ONNX Layer: /softmax/Floor_2]\u001f[ONNX Layer: /softmax/Mul]\u001f[ONNX Layer: /softmax/Reciprocal]\u001f[ONNX Layer: /softmax/Mul_2]\u001f[ONNX Layer: /softmax/Sub_2]\u001f[ONNX Layer: /softmax/Sub_3]\u001f[ONNX Layer: /softmax/Div_4]\u001f[ONNX Layer: /softmax/Floor_4]\u001f[ONNX Layer: /softmax/Mul_3]\u001f[ONNX Layer: /softmax/Pow]\u001f[ONNX Layer: /softmax/Sub_4]\u001f[ONNX Layer: /softmax/Floor_3]\u001f[ONNX Layer: /softmax/Div_3]\u001f[ONNX Layer: /softmax/Div_2]\u001f[ONNX Layer: /softmax/Floor_1]\u001f[ONNX Layer: /softmax/Add]\u001f[ONNX Layer: /softmax/Sub_1]\u001f[ONNX Layer: /softmax/Floor]\u001f[ONNX Layer: /softmax/Div_1]\u001f[ONNX Layer: /softmax/Round]\u001f[ONNX Layer: /softmax/ReduceMax]\u001f[ONNX Layer: /softmax/Sub]\u001f[ONNX Layer: /qact_fc1/DequantizeLinear]"
+}
+--- Layer 4 ---
+{
+  "Name": "/fc2/Gemm_myl0_4",
+  "LayerType": "gemm",
+  "Inputs": [
+  {
+    "Name": "/fc2/Gemm_output_0.1_6_myl0",
+    "Dimensions": [-1,64],
+    "Format/Datatype": "Float"
+  }],
+  "Outputs": [
+  {
+    "Name": "__myln_k_arg__bb1_7_myl0",
+    "Dimensions": [-1,32],
+    "Format/Datatype": "Float"
+  }],
+  "TacticName": "sm86_xmma_gemm_f32f32_tf32f32_f32_nn_n_tilesize32x32x64_stage6_warpsize2x2x1_tensor16x8x8",
+  "StreamId": 0,
+  "Metadata": "[ONNX Layer: /fc2/Gemm]\u001f[ONNX Layer: /softmax/Mul_6]\u001f[ONNX Layer: /fc2/DequantizeLinear]\u001f[ONNX Layer: /fc2/QuantizeLinear]"
+}
+--- Layer 5 ---
+{
+  "Name": "__myl_MulMinMaxRounCastCastMul_myl0_5",
+  "LayerType": "kgen",
+  "Inputs": [
+  {
+    "Name": "__myln_k_arg__bb1_7_myl0",
+    "Dimensions": [-1,32],
+    "Format/Datatype": "Float"
+  }],
+  "Outputs": [
+  {
+    "Name": "logits",
+    "Dimensions": [-1,32],
+    "Format/Datatype": "Float"
+  }],
+  "TacticName": "__myl_MulMinMaxRounCastCastMul_0xf779190b519a795ed6a150ff9fdb964f",
+  "StreamId": 0,
+  "Metadata": "[ONNX Layer: /qact_fc2/QuantizeLinear]\u001f[ONNX Layer: /qact_fc2/DequantizeLinear]"
+}

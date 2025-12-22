@@ -1,0 +1,110 @@
+--- Layer 0 ---
+{
+  "Name": "__mye196_0_myl0_0",
+  "LayerType": "shape_call",
+  "Inputs": [],
+  "Outputs": [],
+  "TacticName": "",
+  "StreamId": 0,
+  "Metadata": ""
+}
+--- Layer 1 ---
+{
+  "Name": "__myl_ReplConcMulMinMaxRounCast_myl0_1",
+  "LayerType": "kgen",
+  "Inputs": [
+  {
+    "Name": "input",
+    "Dimensions": [-1,16],
+    "Format/Datatype": "Float"
+  }],
+  "Outputs": [
+  {
+    "Name": "/act_q/QuantizeLinear_output_0.1_6_myl0",
+    "Dimensions": [-1,16],
+    "Format/Datatype": "Int8"
+  }],
+  "TacticName": "__myl_ReplConcMulMinMaxRounCast_0xaac5a0a6e32dd2c1f2e0c2c3d2c910df",
+  "StreamId": 0,
+  "Metadata": "[ONNX Layer: /input_q/QuantizeLinear]"
+}
+--- Layer 2 ---
+{
+  "Name": "/fc1/MatMul_myl0_2",
+  "LayerType": "gemm",
+  "Inputs": [
+  {
+    "Name": "/act_q/QuantizeLinear_output_0.1_6_myl0",
+    "Dimensions": [-1,16],
+    "Format/Datatype": "Int8"
+  }],
+  "Outputs": [
+  {
+    "Name": "/act_q2/QuantizeLinear_output_0.1_7_myl0",
+    "Dimensions": [-1,32],
+    "Format/Datatype": "Int8"
+  }],
+  "TacticName": "sm80_xmma_gemm_i8i8_i8i32_f32_tn_n_tilesize32x64x64_stage6_warpsize2x2x1_tensor16x8x32",
+  "StreamId": 0,
+  "Metadata": "[ONNX Layer: /fc1/MatMul]\u001f[ONNX Layer: /input_q/DequantizeLinear]\u001f[ONNX Layer: /fc1/DequantizeLinear]\u001f[ONNX Layer: /act_q/QuantizeLinear]\u001f[ONNX Layer: /fc1/Transpose]\u001f[ONNX Layer: /fc1/QuantizeLinear]"
+}
+--- Layer 3 ---
+{
+  "Name": "/fc2/MatMul_myl0_3",
+  "LayerType": "gemm",
+  "Inputs": [
+  {
+    "Name": "/act_q2/QuantizeLinear_output_0.1_7_myl0",
+    "Dimensions": [-1,32],
+    "Format/Datatype": "Int8"
+  }],
+  "Outputs": [
+  {
+    "Name": "/act_q3/QuantizeLinear_output_0.1_8_myl0",
+    "Dimensions": [-1,32],
+    "Format/Datatype": "Int8"
+  }],
+  "TacticName": "sm80_xmma_fprop_implicit_gemm_interleaved_i8i8_i8i32_f32_nchw_vect_c_32kcrs_vect_c_32_nchw_vect_c_32_tilesize32x64x64_stage6_warpsize2x2x1_g1_tensor16x8x32_t1r1s1",
+  "StreamId": 0,
+  "Metadata": "[ONNX Layer: /fc2/MatMul]\u001f[ONNX Layer: /act_q/DequantizeLinear]\u001f[ONNX Layer: /fc2/DequantizeLinear]\u001f[ONNX Layer: /act_q2/QuantizeLinear]\u001f[ONNX Layer: /fc2/Transpose]\u001f[ONNX Layer: /fc2/QuantizeLinear]"
+}
+--- Layer 4 ---
+{
+  "Name": "/fc3/MatMul_myl0_4",
+  "LayerType": "gemm",
+  "Inputs": [
+  {
+    "Name": "/act_q3/QuantizeLinear_output_0.1_8_myl0",
+    "Dimensions": [-1,32],
+    "Format/Datatype": "Int8"
+  }],
+  "Outputs": [
+  {
+    "Name": "__myln_k_arg__bb1_9_myl0",
+    "Dimensions": [-1,10],
+    "Format/Datatype": "Int8"
+  }],
+  "TacticName": "sm80_xmma_gemm_i8i8_i8i32_f32_tn_n_tilesize256x64x64_stage3_warpsize4x1x1_tensor16x8x32",
+  "StreamId": 0,
+  "Metadata": "[ONNX Layer: /fc3/MatMul]\u001f[ONNX Layer: /act_q2/DequantizeLinear]\u001f[ONNX Layer: /fc3/DequantizeLinear]\u001f[ONNX Layer: /act_q3/QuantizeLinear]\u001f[ONNX Layer: /fc3/Transpose]\u001f[ONNX Layer: /fc3/QuantizeLinear]"
+}
+--- Layer 5 ---
+{
+  "Name": "__myl_CastMulSlic_myl0_5",
+  "LayerType": "kgen",
+  "Inputs": [
+  {
+    "Name": "__myln_k_arg__bb1_9_myl0",
+    "Dimensions": [-1,10],
+    "Format/Datatype": "Int8"
+  }],
+  "Outputs": [
+  {
+    "Name": "logits",
+    "Dimensions": [-1,10],
+    "Format/Datatype": "Float"
+  }],
+  "TacticName": "__myl_CastMulSlic_0xd632e76fbf84a3e1e2e0b691d95354fd",
+  "StreamId": 0,
+  "Metadata": "[ONNX Layer: /act_q3/DequantizeLinear]"
+}

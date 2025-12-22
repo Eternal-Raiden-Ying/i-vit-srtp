@@ -1,0 +1,21 @@
+*
+!.gitignore
+
+# 只保留这些目录里的 .py
+!*.py
+!models/
+!utils/
+!models/quantization_utils/
+!models/fx_quant/
+!models/fx_quant/quantization_utils/
+!/models/**/*.py
+!/utils/**/*.py
+
+# simple_test 目录下保留所有文件
+!simple_test/
+!/simple_test/*
+
+!script.sh
+!I-Vit.pdf
+!layer_info.json
+!test_clean.onnx

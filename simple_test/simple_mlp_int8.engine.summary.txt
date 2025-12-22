@@ -1,0 +1,5 @@
+=== Engine IO tensors ===
+[0] INPUT input, shape=(-1, 16), dtype=DataType.FLOAT
+[1] OUTPUT logits, shape=(-1, 10), dtype=DataType.FLOAT
+
+NOTE: For full graph & Q/DQ nodes, use `trtexec --loadEngine=... --dumpLayerInfo`.
