@@ -27,5 +27,8 @@
 !typings/
 !/typings/*
 
+!dataset_prepare/
+!dataset_prepare/*
+
 !script.sh
 !I-Vit.pdf
