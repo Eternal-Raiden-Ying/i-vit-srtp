@@ -140,15 +140,15 @@ class Mlp(nn.Module):
             hidden_features,
             out_features
         )
-        self.qact2 = QuantAct()
-        # self.qact2 = QuantAct(16)
+        # self.qact2 = QuantAct()
+        self.qact2 = QuantAct(16)
         self.drop = nn.Dropout(drop)
 
         self.qact_gelu = QuantAct()
 
     def forward(self, x, act_scaling_factor):
         x, act_scaling_factor = self.fc1(x, act_scaling_factor)
-        x, act_scaling_factor = self.qact_gelu(x, act_scaling_factor)
+        x, act_scaling_factor = self.qact_gelu(x, act_scaling_factor)  # ?这顺序有问题吧
         x, act_scaling_factor = self.act(x, act_scaling_factor)
         x, act_scaling_factor = self.qact1(x, act_scaling_factor)
         x = self.drop(x)
@@ -183,8 +183,8 @@ class PatchEmbed(nn.Module):
         if self.norm_layer:
             self.qact_before_norm = QuantAct()
             self.norm = norm_layer(embed_dim)
-        self.qact = QuantAct()
-        # self.qact = QuantAct(16)
+        # self.qact = QuantAct()
+        self.qact = QuantAct(16)
 
         self.export_mode = False
 
@@ -196,15 +196,6 @@ class PatchEmbed(nn.Module):
             H == self.img_size[0] and W == self.img_size[1]
         ), f"Input image size ({H}*{W}) doesn't match model ({self.img_size[0]}*{self.img_size[1]})."
         
-        x, act_scaling_factor = self.proj(x, act_scaling_factor)
-        x = x.flatten(2).transpose(1, 2)
-        if self.norm_layer:
-            x, act_scaling_factor = self.qact_before_norm(x, act_scaling_factor)
-            x, act_scaling_factor = self.norm(x, act_scaling_factor)
-        x, act_scaling_factor = self.qact(x, act_scaling_factor)
-        return x, act_scaling_factor
-    
-    def export_forward(self, x, act_scaling_factor):
         x, act_scaling_factor = self.proj(x, act_scaling_factor)
         x = x.flatten(2).transpose(1, 2)
         if self.norm_layer:

@@ -34,6 +34,9 @@ from .quant_utils import *
 """
 
 
+# TODO: quantlinear的per channel 维度可能不对  应该是对的（2.1）
+#       quantact的per channel 根本用不到吧 （2.1）
+
 class QuantLinear(nn.Linear):
     """
     用于量化给定 Linear 层权重的类。
@@ -178,6 +181,7 @@ class QuantLinear(nn.Linear):
         assert self.running_stat is False and self.full_int_inference is False, "only export from fixed fake-quant model"
         assert self.quant_mode == "symmetric", "only support symmetric quantization for export"
         
+
         if self.per_channel:
             return (F.linear(
                 x,
@@ -369,6 +373,17 @@ class QuantAct(nn.Module):
     
         assert self.running_stat is False and self.full_int_inference is False, "only export from fixed fake-quant model"
         assert self.quant_mode == "symmetric", "only support symmetric quantization for export"
+
+        if self.activation_bit > 8:
+            # 当成int32来处理 因为tensorRT除了自定义不支持int16格式
+            x = x.div(self.act_scaling_factor) + self.act_zp
+            if identity is not None:
+                identity = identity.div(self.act_scaling_factor) + self.act_zp
+                x = x + identity
+            x = x.round().clamp(-(2**31), 2**31 -1)
+            return x.to(torch.int32) * self.act_scaling_factor, self.act_scaling_factor
+
+            
 
         if self.per_channel:
             if x.ndim == 4:
@@ -649,6 +664,7 @@ class IntLayerNorm(nn.LayerNorm):
         self.register_buffer('bias_integer', torch.zeros_like(self.bias))
 
         self.export_mode = False
+        self.float_op = False
 
     def fix(self):
         self.running_stat = False
@@ -665,7 +681,7 @@ class IntLayerNorm(nn.LayerNorm):
 
     def forward(self, x, scaling_factor=None):
 
-        if self.export_mode:
+        if self.export_mode or self.float_op:
             return self.export_forward(x, scaling_factor)
 
         if self.dim_sqrt is None:
@@ -718,8 +734,7 @@ class IntLayerNorm(nn.LayerNorm):
         scaling_factor : scale
             (x/scale) already quantized (default int8)
         """
-        assert self.running_stat is False and self.full_int_inference is False, "only export from fixed fake-quant model"
-
+        # x = x.to(torch.float32)
         mean = x.mean(axis=2, keepdim=True)
         y = x - mean
         var = torch.sum(torch.square(y), dim=2, keepdim=True) / x.shape[2]
@@ -729,7 +744,7 @@ class IntLayerNorm(nn.LayerNorm):
 
         y = y * self.weight + self.bias
 
-        return y, self.norm_scaling_factor
+        return y, 1
 
 
 class IntGELU(nn.Module):
@@ -751,6 +766,7 @@ class IntGELU(nn.Module):
 
         self.register_buffer('act_scaling_factor', torch.zeros(1))
         self.export_mode = False
+        self.float_op = False
 
     def fix(self):
         self.running_stat = False
@@ -777,8 +793,7 @@ class IntGELU(nn.Module):
         return exp_int, scaling_factor
 
     def forward(self, x, scaling_factor=None):
-
-        if self.export_mode:
+        if self.export_mode or self.float_op:
             return self.export_forward(x, scaling_factor)
 
         pre_x_int = x if self.full_int_inference else round_ste.apply(x / scaling_factor)
@@ -809,9 +824,7 @@ class IntGELU(nn.Module):
             return x_int * self.act_scaling_factor, self.act_scaling_factor
 
     def export_forward(self, x, scaling_factor=None):
-        assert self.running_stat is False and self.full_int_inference is False
-
-        return F.gelu(x), self.act_scaling_factor
+        return F.gelu(x), 1
 
 
 class IntSoftmax(nn.Module):
@@ -830,6 +843,7 @@ class IntSoftmax(nn.Module):
 
         self.register_buffer('act_scaling_factor', torch.zeros(1))
         self.export_mode = False
+        self.float_op = False
 
     def fix(self):
         pass
@@ -857,6 +871,9 @@ class IntSoftmax(nn.Module):
         return exp_int, scaling_factor
 
     def forward(self, x, scaling_factor):
+        if self.export_mode or self.float_op:
+            return self.export_forward(x, scaling_factor)
+
         x_int = x if self.full_int_inference else round_ste.apply(x / scaling_factor)
         x_int_max, _ = x_int.max(dim=-1, keepdim=True)
         x_int = x_int - x_int_max
@@ -877,33 +894,4 @@ class IntSoftmax(nn.Module):
             return exp_int * self.act_scaling_factor, self.act_scaling_factor
     
     def export_forward(self, x, scaling_factor=None):
-        assert self.full_int_inference is False, "only export from fake-quant model"
-
-        return F.softmax(x, dim=-1), self.act_scaling_factor
-
-# class QuantLayerNorm(nn.LayerNorm):
-#     """
-#     Class to quantize given LayerNorm layer
-#     """
-#     def __init__(self, 
-#                 normalized_shape, 
-#                 eps=1e-5,
-#                 elementwise_affine=True,
-#                 running_stat=True,
-#                 full_int_inference=False):
-#         super(QuantLayerNorm, self).__init__(normalized_shape, eps, elementwise_affine)
-#         self.running_stat = running_stat
-#         self.register_buffer('norm_scaling_factor', torch.zeros(1))
-
-#     def fix(self):
-#         self.running_stat = False
-
-#     def unfix(self):
-#         self.running_stat = True       
-
-#     def forward(self, x, scaling_factor=None):
-#         x = F.layer_norm(x, self.normalized_shape, self.weight, self.bias, self.eps)
-#         if self.running_stat:
-#             self.norm_scaling_factor = scaling_factor * self.weight
-#         return x * self.norm_scaling_factor, self.norm_scaling_factor
-    
+        return F.softmax(x, dim=-1), 1

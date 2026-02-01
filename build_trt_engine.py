@@ -3,8 +3,8 @@ import json
 import tensorrt as trt
 
 
-ONNX_PATH = "test.onnx"
-ENGINE_PATH = "test.engine"
+ONNX_PATH = "simplified_QuantViT.onnx"
+ENGINE_PATH = "QuantViT.engine"
 
 
 def build_engine(onnx_path, engine_path):
@@ -54,12 +54,11 @@ def build_engine(onnx_path, engine_path):
     # --- 为动态 batch 输入添加 OptimizationProfile（关键修改） ---
     input_tensor = network.get_input(0)
     input_name = input_tensor.name
-    _, feat_dim = input_tensor.shape  # (-1, 16) -> feat_dim = 16
+    B, N, H, W = input_tensor.shape  # (-1, 16) -> feat_dim = 16
 
-    min_shape = (1, feat_dim)
-    opt_shape = (8, feat_dim)
-    max_shape = (32, feat_dim)
-
+    min_shape = (1, N, H, W)
+    opt_shape = (8, N, H, W)
+    max_shape = (32, N, H, W)
     profile = builder.create_optimization_profile()
     profile.set_shape(input_name, min_shape, opt_shape, max_shape)
     config.add_optimization_profile(profile)

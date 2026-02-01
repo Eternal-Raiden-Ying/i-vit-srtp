@@ -15,7 +15,7 @@ def freeze_model(model):
     """
     model.running_int = False
     for child in model.children():
-        # 如果子模块是QuantLinear的实例，则调用full_int_model方法
+        # 如果子模块是QuantLinear的实例，则调用freeze_model方法
         if isinstance(child, classes_to_fix):
             child.fix()
         # 递归遍历子模块
@@ -27,7 +27,7 @@ def unfreeze_model(model):
     """
     model.running_int = True
     for child in model.children():
-        # 如果子模块是QuantLinear的实例，则调用full_int_model方法
+        # 如果子模块是QuantLinear的实例，则调用unfreeze_model方法
         if isinstance(child, classes_to_fix):
             child.unfix()
         # 递归遍历子模块
@@ -48,7 +48,7 @@ def int_model(model):
 def un_int_model(model):
     model.full_int_inference = False
     for child in model.children():
-        # 如果子模块是QuantLinear的实例，则调用full_int_model方法
+        # 如果子模块是QuantLinear的实例，则调用un_int_model方法
         if isinstance(child, classes_to_int):
             child.unfull_int_model()
         # 递归遍历子模块

@@ -47,11 +47,11 @@ def main():
         dummy_input,
         onnx_path,
         export_params=True,
-        opset_version=13,
+        opset_version=9,
         do_constant_folding=True,
         input_names=["input"],
         output_names=["logits"],
-        dynamic_axes={"input": {0: "batch"}, "logits": {0: "batch"}},
+        dynamic_axes={},
     )
 
     print(f"exported ONNX to {onnx_path}")

@@ -15,7 +15,17 @@
 !simple_test/
 !/simple_test/*
 
+!trt_model/
+!trt_model/module/
+!trt_model/module/custom_op/
+!trt_model/plugins/
+!trt_model/*
+!trt_model/module/*
+!trt_model/module/custom_op/*
+!trt_model/plugins/*
+
+!typings/
+!/typings/*
+
 !script.sh
 !I-Vit.pdf
-!layer_info.json
-!test_clean.onnx

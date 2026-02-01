@@ -1,6 +1,6 @@
 import tensorrt as trt
 
-TAEGET_ENGINE = "test.engine"
+TAEGET_ENGINE = "./QuantViT.engine"
 
 logger = trt.Logger(trt.Logger.INFO)
 
@@ -30,7 +30,7 @@ inspector = engine.create_engine_inspector()
 #         s = inspector.get_layer_information(layer_idx, trt.LayerInformationFormat.DETAILED)
 #         print(f"--- Layer {layer_idx} ---\n")
 #         print(s + "\n")
-with open('layer_info.json', 'w') as f:
+with open('QuantViT.json', 'w') as f:
     for layer_idx in range(engine.num_layers):
         s = inspector.get_layer_information(layer_idx, trt.LayerInformationFormat.JSON)
         f.write(f"--- Layer {layer_idx} ---\n")

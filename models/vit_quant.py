@@ -9,8 +9,8 @@ from .quantization_utils import QuantLinear, QuantAct, QuantConv2d, IntLayerNorm
 from .utils import load_weights_from_npz
 
 
-__all__ = ['deit_tiny_patch16_224', 'deit_small_patch16_224', 'deit_base_patch16_224',
-           'vit_base_patch16_224', 'vit_large_patch16_224']
+# __all__ = ['deit_tiny_patch16_224', 'deit_small_patch16_224', 'deit_base_patch16_224',
+#            'vit_base_patch16_224', 'vit_large_patch16_224']
 
 
 class Attention(nn.Module):
@@ -45,8 +45,8 @@ class Attention(nn.Module):
             dim,
             dim
         )
-        self.qact3 = QuantAct()
-        # self.qact3 = QuantAct(16)
+        # self.qact3 = QuantAct()
+        self.qact3 = QuantAct(16)
         self.qact_softmax = QuantAct()
         self.attn_drop = nn.Dropout(attn_drop)
         self.proj_drop = nn.Dropout(proj_drop)
@@ -54,14 +54,6 @@ class Attention(nn.Module):
 
         self.matmul_1 = QuantMatMul()
         self.matmul_2 = QuantMatMul()
-
-        self.export_mode = False
-        self.q_linear = QuantLinear(dim, dim, bias=qkv_bias)
-        self.k_linear = QuantLinear(dim, dim, bias=qkv_bias)
-        self.v_linear = QuantLinear(dim, dim, bias=qkv_bias)
-        self.q_qact = QuantAct()
-        self.k_qact = QuantAct()
-        self.v_qact = QuantAct()
         
     def full_int_model(self):
         self.full_int_inference = True
@@ -72,7 +64,7 @@ class Attention(nn.Module):
 
     def forward(self, x, act_scaling_factor):
         if self.export_mode:
-            self.export_forward(x, act_scaling_factor)
+            return self.export_forward(x, act_scaling_factor)
 
         B, N, C = x.shape
         x, act_scaling_factor = self.qkv(x, act_scaling_factor)
@@ -110,29 +102,24 @@ class Attention(nn.Module):
         x = self.proj_drop(x)
 
         return x, act_scaling_factor
-    
-    def export_perpare(self):
-
 
     def export_forward(self, x, act_scaling_factor):
         B, N, C = x.shape
-        dim_per_head = C // self.num_heads
-
-        q, q_act_scaling_factor = self.q_linear(x, act_scaling_factor)
-        k, k_act_scaling_factor = self.k_linear(x, act_scaling_factor)
-        v, v_act_scaling_factor = self.v_linear(x, act_scaling_factor)
-        q, q_act_scaling_factor = self.q_qact(q, q_act_scaling_factor)
-        k, k_act_scaling_factor = self.k_qact(k, k_act_scaling_factor)
-        v, v_act_scaling_factor = self.v_qact(v, v_act_scaling_factor)
-
-        q = q.reshape(B, N, self.num_heads, dim_per_head).permute(0, 2, 1, 3)
-        k = k.reshape(B, N, self.num_heads, dim_per_head).permute(0, 2, 3, 1)
-        v = v.reshape(B, N, self.num_heads, dim_per_head).permute(0, 2, 1, 3)
+        x, act_scaling_factor = self.qkv(x, act_scaling_factor)
+        x, act_scaling_factor_1 = self.qact1(x, act_scaling_factor)
+        qkv = x.reshape(B, N, 3, self.num_heads, C //
+                        self.num_heads).permute(2, 0, 3, 1, 4)  # (BN33)
+        q, k, v = (
+            qkv[0],
+            qkv[1],
+            qkv[2],
+        )  # make torchscript happy (cannot use tensor as tuple)
+        attn, act_scaling_factor = self.matmul_1(q, act_scaling_factor_1,
+                                                 k.transpose(-2, -1), act_scaling_factor_1)
         
-        attn, act_scaling_factor = self.matmul_1(q, q_act_scaling_factor,
-                                                 k, k_act_scaling_factor)
-        
-        # scale has been fused into k weight during export
+        attn = attn * self.scale
+        act_scaling_factor = act_scaling_factor * self.scale
+
         attn, act_scaling_factor = self.qact_attn1(attn, act_scaling_factor)
 
         attn, act_scaling_factor = self.int_softmax(attn, act_scaling_factor)
@@ -141,7 +128,7 @@ class Attention(nn.Module):
         attn = self.attn_drop(attn)
         
         x, act_scaling_factor = self.matmul_2(attn, act_scaling_factor,
-                                              v, v_act_scaling_factor)
+                                              v, act_scaling_factor_1)
         
         x = x.transpose(1, 2).reshape(B, N, C)
 
@@ -180,8 +167,8 @@ class Block(nn.Module):
         # NOTE: drop path for stochastic depth, we shall see if this is better than dropout here
         self.drop_path = DropPath(
             drop_path) if drop_path > 0.0 else nn.Identity()
-        self.qact2 = QuantAct()
-        # self.qact2 = QuantAct(16)
+        # self.qact2 = QuantAct()
+        self.qact2 = QuantAct(16)
         self.norm2 = norm_layer(dim)
         self.qact3 = QuantAct()
         mlp_hidden_dim = int(dim * mlp_ratio)
@@ -191,8 +178,8 @@ class Block(nn.Module):
             act_layer=act_layer,
             drop=drop
         )
-        self.qact4 = QuantAct()
-        # self.qact4 = QuantAct(16)
+        # self.qact4 = QuantAct()
+        self.qact4 = QuantAct(16)
 
     def forward(self, x_1, act_scaling_factor_1):
         x, act_scaling_factor = self.norm1(x_1, act_scaling_factor_1)
@@ -262,12 +249,12 @@ class VisionTransformer(nn.Module):
             torch.zeros(1, num_patches + 1, embed_dim))
 
         self.pos_drop = nn.Dropout(p=drop_rate)
-        self.qact_cls = QuantAct()
-        self.qact_pos = QuantAct()
-        self.qact1 = QuantAct()
-        # self.qact_cls = QuantAct(16)
-        # self.qact_pos = QuantAct(16)
-        # self.qact1 = QuantAct(16)
+        # self.qact_cls = QuantAct()
+        # self.qact_pos = QuantAct()
+        # self.qact1 = QuantAct()
+        self.qact_cls = QuantAct(16)
+        self.qact_pos = QuantAct(16)
+        self.qact1 = QuantAct(16)
 
         dpr = [
             x.item() for x in torch.linspace(0, drop_path_rate, depth)
@@ -340,6 +327,11 @@ class VisionTransformer(nn.Module):
     def unfix(self):
         self.running_int = True
 
+    def set_float_op(self, float_op=True):
+        for child in self.children():
+            if hasattr(child, 'float_op'):
+                child.float_op = float_op
+            child.set_float_op(float_op)
 
     def forward_features(self, x):
         B = x.shape[0]
