@@ -1,8 +1,8 @@
 import os
 
 
-target_dir = ""  # val_dir
-file_dir = ""
+target_dir = "/root/autodl-tmp/imagenet/val"  # val_dir
+file_dir = "/root/autodl-tmp/i-vit-srtp/dataset_prepare"
 
 if __name__ == "__main__":
 

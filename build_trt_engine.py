@@ -2,8 +2,8 @@ import json
 
 import tensorrt as trt
 
-
-ONNX_PATH = "simplified_QuantViT.onnx"
+# to get sim onnx, run 'onnx QuantViT.onnx QuantViT_sim.onxx'
+ONNX_PATH = "QuantViT_sim.onnx"
 ENGINE_PATH = "QuantViT.engine"
 
 
@@ -57,8 +57,8 @@ def build_engine(onnx_path, engine_path):
     B, N, H, W = input_tensor.shape  # (-1, 16) -> feat_dim = 16
 
     min_shape = (1, N, H, W)
-    opt_shape = (8, N, H, W)
-    max_shape = (32, N, H, W)
+    opt_shape = (256, N, H, W)
+    max_shape = (512, N, H, W)
     profile = builder.create_optimization_profile()
     profile.set_shape(input_name, min_shape, opt_shape, max_shape)
     config.add_optimization_profile(profile)

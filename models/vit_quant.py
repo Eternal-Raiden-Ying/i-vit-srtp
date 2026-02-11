@@ -3,6 +3,7 @@ from functools import partial
 
 import torch
 from torch import nn
+import torch.nn.functional as F
 
 from .layers_quant import PatchEmbed, Mlp, DropPath, trunc_normal_
 from .quantization_utils import QuantLinear, QuantAct, QuantConv2d, IntLayerNorm, IntSoftmax, IntGELU, QuantMatMul
@@ -30,30 +31,33 @@ class Attention(nn.Module):
         head_dim = dim // num_heads
         # NOTE scale factor was wrong in my original version, can set manually to be compat with prev weights
         self.scale = qk_scale or head_dim ** -0.5
-
         self.export_mode = False
 
+        # module
+        # QKV
         self.qkv = QuantLinear(
             dim,
             dim * 3,
             bias=qkv_bias
         )
         self.qact1 = QuantAct()
-        self.qact_attn1 = QuantAct()
+        # Q@K
+        self.matmul_1 = QuantMatMul()
+        self.qact_attn1 = QuantAct(32)
+        # attention value
+        self.int_softmax = IntSoftmax(16)
+        self.qact_softmax = QuantAct()
+        self.attn_drop = nn.Dropout(attn_drop)
+        # attn*V
+        self.matmul_2 = QuantMatMul()
         self.qact2 = QuantAct()
+        # proj
         self.proj = QuantLinear(
             dim,
             dim
         )
-        # self.qact3 = QuantAct()
-        self.qact3 = QuantAct(16)
-        self.qact_softmax = QuantAct()
-        self.attn_drop = nn.Dropout(attn_drop)
+        self.qact3 = QuantAct(32)
         self.proj_drop = nn.Dropout(proj_drop)
-        self.int_softmax = IntSoftmax(16)
-
-        self.matmul_1 = QuantMatMul()
-        self.matmul_2 = QuantMatMul()
         
     def full_int_model(self):
         self.full_int_inference = True
@@ -167,8 +171,7 @@ class Block(nn.Module):
         # NOTE: drop path for stochastic depth, we shall see if this is better than dropout here
         self.drop_path = DropPath(
             drop_path) if drop_path > 0.0 else nn.Identity()
-        # self.qact2 = QuantAct()
-        self.qact2 = QuantAct(16)
+        self.qact2 = QuantAct(32)
         self.norm2 = norm_layer(dim)
         self.qact3 = QuantAct()
         mlp_hidden_dim = int(dim * mlp_ratio)
@@ -178,8 +181,7 @@ class Block(nn.Module):
             act_layer=act_layer,
             drop=drop
         )
-        # self.qact4 = QuantAct()
-        self.qact4 = QuantAct(16)
+        self.qact4 = QuantAct(32)
 
     def forward(self, x_1, act_scaling_factor_1):
         x, act_scaling_factor = self.norm1(x_1, act_scaling_factor_1)
@@ -227,6 +229,8 @@ class VisionTransformer(nn.Module):
         self.num_classes = num_classes
         self.full_int_inference = full_int_inference # 是否进行全整数推理
         self.running_int = running_int # 是否对整型参数进行统计
+        self.float_op = True
+        
         self.num_features = (
             self.embed_dim
         ) = embed_dim  # num_features for consistency with other models
@@ -252,9 +256,9 @@ class VisionTransformer(nn.Module):
         # self.qact_cls = QuantAct()
         # self.qact_pos = QuantAct()
         # self.qact1 = QuantAct()
-        self.qact_cls = QuantAct(16)
-        self.qact_pos = QuantAct(16)
-        self.qact1 = QuantAct(16)
+        self.qact_cls = QuantAct(32)
+        self.qact_pos = QuantAct(32)
+        self.qact1 = QuantAct(32)
 
         dpr = [
             x.item() for x in torch.linspace(0, drop_path_rate, depth)
@@ -277,7 +281,7 @@ class VisionTransformer(nn.Module):
             ]
         )
         self.norm = norm_layer(embed_dim)
-        self.qact2 = QuantAct()
+        self.qact2 = QuantAct(32)
 
         # Representation layer
         if representation_size:
@@ -327,15 +331,20 @@ class VisionTransformer(nn.Module):
     def unfix(self):
         self.running_int = True
 
-    def set_float_op(self, float_op=True):
-        for child in self.children():
-            if hasattr(child, 'float_op'):
-                child.float_op = float_op
-            child.set_float_op(float_op)
-
     def forward_features(self, x):
         B = x.shape[0]
-
+        # if self.float_op:
+        #     x = F.conv2d(x, weight=self.patch_embed.proj.weight, 
+        #                  bias=self.patch_embed.proj.bias if self.patch_embed.proj.bias is not None else None,
+        #                  stride=self.patch_embed.proj.stride,
+        #                  padding=self.patch_embed.proj.padding,
+        #                  dilation=self.patch_embed.proj.dilation,
+        #                  groups=self.patch_embed.proj.groups).flatten(2).transpose(1, 2)
+        #     x = torch.cat((self.cls_token.expand(B, -1, -1), x), dim=1)
+        #     x = x + self.pos_embed
+        #     x = self.pos_drop(x)
+        #     x, act_scaling_factor = self.qact1(x)
+        # else:
         x, act_scaling_factor = self.qact_input(x)
         x, act_scaling_factor = self.patch_embed(x, act_scaling_factor)
         
@@ -363,6 +372,9 @@ class VisionTransformer(nn.Module):
 
     def forward(self, x):
         x, act_scaling_factor = self.forward_features(x)
+        # if self.float_op:
+        #     x = F.linear(x, weight=self.head.weight, bias=self.head.bias)
+        # else:
         x, act_scaling_factor = self.head(x, act_scaling_factor)
         if self.full_int_inference:
             return x*act_scaling_factor # 整型推理传递最后需要放回浮点以计算损失等，判断正确率等。

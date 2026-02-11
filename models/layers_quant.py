@@ -128,29 +128,33 @@ class Mlp(nn.Module):
         super().__init__()
         out_features = out_features or in_features
         hidden_features = hidden_features or in_features
+        
         # self.fc1 = nn.Linear(in_features, hidden_features)
         self.fc1 = QuantLinear(
             in_features,
             hidden_features
         )
+        self.qact1 = QuantAct(32)
+        
+        # GELU
         self.act = act_layer()
-        self.qact1 = QuantAct()
+        self.qact_gelu = QuantAct()
+        
         # self.fc2 = nn.Linear(hidden_features, out_features)
         self.fc2 = QuantLinear(
             hidden_features,
             out_features
         )
-        # self.qact2 = QuantAct()
-        self.qact2 = QuantAct(16)
+        self.qact2 = QuantAct(32)
         self.drop = nn.Dropout(drop)
 
-        self.qact_gelu = QuantAct()
+        
 
     def forward(self, x, act_scaling_factor):
         x, act_scaling_factor = self.fc1(x, act_scaling_factor)
-        x, act_scaling_factor = self.qact_gelu(x, act_scaling_factor)  # ?这顺序有问题吧
-        x, act_scaling_factor = self.act(x, act_scaling_factor)
         x, act_scaling_factor = self.qact1(x, act_scaling_factor)
+        x, act_scaling_factor = self.act(x, act_scaling_factor)
+        x, act_scaling_factor = self.qact_gelu(x, act_scaling_factor)
         x = self.drop(x)
         x, act_scaling_factor = self.fc2(x, act_scaling_factor)
         x, act_scaling_factor = self.qact2(x, act_scaling_factor)
@@ -184,17 +188,18 @@ class PatchEmbed(nn.Module):
             self.qact_before_norm = QuantAct()
             self.norm = norm_layer(embed_dim)
         # self.qact = QuantAct()
-        self.qact = QuantAct(16)
+        self.qact = QuantAct(32)
 
         self.export_mode = False
 
-    def forward(self, x, act_scaling_factor):
-        B, C, H, W = x.shape
-        
-        # FIXME look at relaxing size constraints
-        assert (
-            H == self.img_size[0] and W == self.img_size[1]
-        ), f"Input image size ({H}*{W}) doesn't match model ({self.img_size[0]}*{self.img_size[1]})."
+    def forward(self, x, act_scaling_factor): 
+        if not self.export_mode:
+            # for export mode we assume img size is compatible
+            B, C, H, W = x.shape
+            # FIXME look at relaxing size constraints
+            assert (
+                H == self.img_size[0] and W == self.img_size[1]
+            ), f"Input image size ({H}*{W}) doesn't match model ({self.img_size[0]}*{self.img_size[1]})."
         
         x, act_scaling_factor = self.proj(x, act_scaling_factor)
         x = x.flatten(2).transpose(1, 2)

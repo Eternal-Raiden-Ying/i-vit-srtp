@@ -2,6 +2,17 @@ import tensorrt as trt
 
 TAEGET_ENGINE = "./QuantViT.engine"
 
+
+"""
+    QuantViT.engine的检查结果如下:
+        embedding层：卷积中matmul是int8，加bias是fp，后续的cls token和pos embed都融合成一个算子了，判断不了内部的执行逻辑
+        所有残差连接的地方用的fp，应该是所有quant_act(16)地方都用的fp执行，暂时没找到反例
+        softmax算子的input output接口处都是int8， nvidia应该内部有优化，onnx里面是作为fp处理的，QDQ还是给融合成int8了（内部可能还是fp在算）
+"""
+
+
+
+
 logger = trt.Logger(trt.Logger.INFO)
 
 # 1. 反序列化 engine
@@ -35,5 +46,7 @@ with open('QuantViT.json', 'w') as f:
         s = inspector.get_layer_information(layer_idx, trt.LayerInformationFormat.JSON)
         f.write(f"--- Layer {layer_idx} ---\n")
         f.write(s + "\n")
+
+
 
 

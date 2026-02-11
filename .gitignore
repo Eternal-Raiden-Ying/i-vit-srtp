@@ -11,7 +11,7 @@
 !/models/**/*.py
 !/utils/**/*.py
 
-# simple_test 目录下保留所有文件
+# simple_test 目录下保留所有文件 已删除
 !simple_test/
 !/simple_test/*
 
@@ -28,7 +28,8 @@
 !/typings/*
 
 !dataset_prepare/
-!dataset_prepare/*
+!dataset_prepare/*.txt
+!dataset_prepare/*.py
 
 !script.sh
 !I-Vit.pdf

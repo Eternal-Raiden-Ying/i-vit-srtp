@@ -53,3 +53,17 @@ def un_int_model(model):
             child.unfull_int_model()
         # 递归遍历子模块
         un_int_model(child)
+
+def set_float_op(model, flag):
+    if hasattr(model, 'float_op'):
+        model.float_op = flag
+    for child in model.children():
+        set_float_op(child, flag)
+
+
+def export_model(model):
+    for child in model.children():
+        if hasattr(child, 'export_mode'):
+            child.export_mode = True
+        export_model(child)
+            

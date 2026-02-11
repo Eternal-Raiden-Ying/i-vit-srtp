@@ -245,8 +245,8 @@ class QuantAct(nn.Module):
         # 初始化缓冲区
         self.min_val = torch.zeros(1)
         self.max_val = torch.zeros(1)
-        self.register_buffer('act_scaling_factor', torch.zeros(1))
-        self.register_buffer('act_zp', torch.zeros(1, dtype=torch.int))
+        self.register_buffer('act_scaling_factor', torch.zeros([]))
+        self.register_buffer('act_zp', torch.zeros([], dtype=torch.int))
 
         # 设置量化模式
         if self.quant_mode == "symmetric":
@@ -261,7 +261,7 @@ class QuantAct(nn.Module):
                "quant_mode: {2}, Act_min: {3:.2f}, " \
                "Act_max: {4:.2f})," \
                 "输出量化因子: {5:.2f}".format(self.__class__.__name__, self.activation_bit,
-                                          self.quant_mode, self.x_min.item(), self.x_max.item(), self.act_scaling_factor.item())
+                                          self.quant_mode, self.min_val, self.max_val, self.act_scaling_factor.item())
 
     def fix(self):
         """
@@ -446,7 +446,7 @@ class QuantMatMul(nn.Module):
     def __init__(self, running_stat=True, full_int_inference=False):
         super(QuantMatMul, self).__init__()
         # 注册一个缓冲区来存储激活的缩放因子
-        self.register_buffer('act_scaling_factor', torch.zeros(1))
+        self.register_buffer('act_scaling_factor', torch.zeros([]))
         # 状态变量
         self.running_stat = running_stat
         self.full_int_inference = full_int_inference
@@ -544,7 +544,7 @@ class QuantConv2d(nn.Conv2d):
         self.register_buffer('conv_scaling_factor', torch.zeros(self.out_channels))
         self.register_buffer('weight_integer', torch.zeros_like(self.weight))
         self.register_buffer('bias_integer', torch.zeros_like(self.bias))
-        self.register_buffer('conv_opt_scaling_factor', torch.zeros(self.out_channels))
+        self.register_buffer('conv_opt_scaling_factor', torch.zeros((1,self.out_channels,1,1)))
         self.register_buffer('weight_zp', torch.zeros_like(self.conv_scaling_factor, dtype=torch.int))
 
     def __repr__(self):
@@ -660,7 +660,7 @@ class IntLayerNorm(nn.LayerNorm):
         self.dim_sqrt = None
         self.full_int_inference = full_int_inference
         self.running_stat = running_stat
-        self.register_buffer('norm_scaling_factor', torch.zeros(1))
+        self.register_buffer('norm_scaling_factor', torch.zeros([]))
         self.register_buffer('bias_integer', torch.zeros_like(self.bias))
 
         self.export_mode = False
@@ -744,7 +744,7 @@ class IntLayerNorm(nn.LayerNorm):
 
         y = y * self.weight + self.bias
 
-        return y, 1
+        return y, None
 
 
 class IntGELU(nn.Module):
@@ -764,7 +764,7 @@ class IntGELU(nn.Module):
         self.n = 23  # sufficiently large integer
         #The minimum value for ensuring accuracy (varies depending on models)
 
-        self.register_buffer('act_scaling_factor', torch.zeros(1))
+        self.register_buffer('act_scaling_factor', torch.zeros([]))
         self.export_mode = False
         self.float_op = False
 
@@ -824,7 +824,7 @@ class IntGELU(nn.Module):
             return x_int * self.act_scaling_factor, self.act_scaling_factor
 
     def export_forward(self, x, scaling_factor=None):
-        return F.gelu(x), 1
+        return F.gelu(x), None
 
 
 class IntSoftmax(nn.Module):
@@ -841,7 +841,7 @@ class IntSoftmax(nn.Module):
         self.n = 15  # sufficiently large integer
         #The minimum value for ensuring accuracy (varies depending on models)
 
-        self.register_buffer('act_scaling_factor', torch.zeros(1))
+        self.register_buffer('act_scaling_factor', torch.zeros([]))
         self.export_mode = False
         self.float_op = False
 
@@ -894,4 +894,4 @@ class IntSoftmax(nn.Module):
             return exp_int * self.act_scaling_factor, self.act_scaling_factor
     
     def export_forward(self, x, scaling_factor=None):
-        return F.softmax(x, dim=-1), 1
+        return F.softmax(x, dim=-1), None  # torch.ones(1,dtype=torch.float).cuda()
